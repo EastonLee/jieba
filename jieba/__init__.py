@@ -93,6 +93,59 @@ class Tokenizer(object):
                 self.initialized = False
         else:
             abs_path = self.dictionary
+def gen_pfdict(f_name):
+    lfreq = {}
+    ltotal = 0
+    with open(f_name, 'rb') as f:
+        lineno = 0
+        for line in f.read().rstrip().decode('utf-8').splitlines():
+            lineno += 1
+            try:
+                word, freq = line.split(' ')[:2]
+                freq = int(freq)
+                lfreq[word] = freq
+                ltotal += freq
+                for ch in xrange(len(word)):
+                    wfrag = word[:ch + 1]
+                    if wfrag not in lfreq:
+                        lfreq[wfrag] = 0
+            except ValueError as e:
+                logger.debug('%s at line %s %s' % (f_name, lineno, line))
+                raise e
+    return lfreq, ltotal
+
+
+def initialize(dictionary=None):
+    global FREQ, total, initialized, DICTIONARY, DICT_LOCK, tmp_dir
+    if not dictionary:
+        dictionary = DICTIONARY
+    with DICT_LOCK:
+        if initialized:
+            return
+
+        abs_path = os.path.join(_curpath, dictionary)
+        #easton commented
+        #logger.debug("Building prefix dict from %s ..." % abs_path)
+        t1 = time.time()
+        # default dictionary
+        if abs_path == os.path.join(_curpath, "dict.txt"):
+            #easton modified
+            #easton: i prepared built cache file
+            #cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.cache")
+            cache_file = os.path.join(_curpath, 'jieba.cache')
+        else:  # custom dictionary
+            cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.u%s.cache" % md5(
+                abs_path.encode('utf-8', 'replace')).hexdigest())
+
+        load_from_cache_fail = True
+        if os.path.isfile(cache_file) and os.path.getmtime(cache_file) > os.path.getmtime(abs_path):
+            logger.debug("Loading model from cache %s" % cache_file)
+            try:
+                with open(cache_file, 'rb') as cf:
+                    FREQ, total = marshal.load(cf)
+                load_from_cache_fail = False
+            except Exception:
+                load_from_cache_fail = True
 
         with self.lock:
             try:
