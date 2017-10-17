@@ -1,8 +1,8 @@
 from __future__ import absolute_import, unicode_literals
 import re
 import os
-import marshal
 import sys
+import pickle
 from .._compat import *
 
 MIN_FLOAT = -3.14e100
@@ -19,26 +19,11 @@ PrevStatus = {
     'E': 'BM'
 }
 
-
+Force_Split_Words = set([])
 def load_model():
-    _curpath = os.path.normpath(
-        os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-    start_p = {}
-    abs_path = os.path.join(_curpath, PROB_START_P)
-    with open(abs_path, 'rb') as f:
-        start_p = marshal.load(f)
-
-    trans_p = {}
-    abs_path = os.path.join(_curpath, PROB_TRANS_P)
-    with open(abs_path, 'rb') as f:
-        trans_p = marshal.load(f)
-
-    emit_p = {}
-    abs_path = os.path.join(_curpath, PROB_EMIT_P)
-    with open(abs_path, 'rb') as f:
-        emit_p = marshal.load(f)
-
+    start_p = pickle.load(get_module_res("finalseg", PROB_START_P))
+    trans_p = pickle.load(get_module_res("finalseg", PROB_TRANS_P))
+    emit_p = pickle.load(get_module_res("finalseg", PROB_EMIT_P))
     return start_p, trans_p, emit_p
 
 if sys.platform.startswith("java"):
@@ -89,9 +74,13 @@ def __cut(sentence):
     if nexti < len(sentence):
         yield sentence[nexti:]
 
-re_han = re.compile("([\u4E00-\u9FA5]+)")
-re_skip = re.compile("(\d+\.\d+|[a-zA-Z0-9]+)")
+re_han = re.compile("([\u4E00-\u9FD5]+)")
+re_skip = re.compile("([a-zA-Z0-9]+(?:\.\d+)?%?)")
 
+
+def add_force_split(word):
+    global Force_Split_Words
+    Force_Split_Words.add(word)
 
 def cut(sentence):
     sentence = strdecode(sentence)
@@ -99,7 +88,11 @@ def cut(sentence):
     for blk in blocks:
         if re_han.match(blk):
             for word in __cut(blk):
-                yield word
+                if word not in Force_Split_Words:
+                    yield word
+                else:
+                    for c in word:
+                        yield c
         else:
             tmp = re_skip.split(blk)
             for x in tmp:

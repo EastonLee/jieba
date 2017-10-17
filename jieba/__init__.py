@@ -1,5 +1,5 @@
 from __future__ import absolute_import, unicode_literals
-__version__ = '0.37'
+__version__ = '0.39'
 __license__ = 'MIT'
 
 import re
@@ -20,11 +20,10 @@ if os.name == 'nt':
 else:
     _replace_file = os.rename
 
-_get_module_path = lambda path: os.path.normpath(os.path.join(os.getcwd(),
-                                                 os.path.dirname(__file__), path))
 _get_abs_path = lambda path: os.path.normpath(os.path.join(os.getcwd(), path))
 
-DEFAULT_DICT = _get_module_path("dict.txt")
+DEFAULT_DICT = None
+DEFAULT_DICT_NAME = "dict.txt"
 
 log_console = logging.StreamHandler(sys.stderr)
 default_logger = logging.getLogger(__name__)
@@ -35,13 +34,15 @@ DICT_WRITING = {}
 
 pool = None
 
+re_userdict = re.compile('^(.+?)( [0-9]+)?( [a-z]+)?$', re.U)
+
 re_eng = re.compile('[a-zA-Z0-9]', re.U)
 
-# \u4E00-\u9FA5a-zA-Z0-9+#&\._ : All non-space characters. Will be handled with re_han
+# \u4E00-\u9FD5a-zA-Z0-9+#&\._ : All non-space characters. Will be handled with re_han
 # \r\n|\s : whitespace characters. Will not be handled.
-re_han_default = re.compile("([\u4E00-\u9FA5a-zA-Z0-9+#&\._]+)", re.U)
+re_han_default = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&\._%]+)", re.U)
 re_skip_default = re.compile("(\r\n|\s)", re.U)
-re_han_cut_all = re.compile("([\u4E00-\u9FA5]+)", re.U)
+re_han_cut_all = re.compile("([\u4E00-\u9FD5]+)", re.U)
 re_skip_cut_all = re.compile("[^a-zA-Z0-9+#\n]", re.U)
 
 def setLogLevel(log_level):
@@ -52,7 +53,10 @@ class Tokenizer(object):
 
     def __init__(self, dictionary=DEFAULT_DICT):
         self.lock = threading.RLock()
-        self.dictionary = _get_abs_path(dictionary)
+        if dictionary == DEFAULT_DICT:
+            self.dictionary = dictionary
+        else:
+            self.dictionary = _get_abs_path(dictionary)
         self.FREQ = {}
         self.total = 0
         self.user_word_tag_tab = {}
@@ -63,24 +67,25 @@ class Tokenizer(object):
     def __repr__(self):
         return '<Tokenizer dictionary=%r>' % self.dictionary
 
-    def gen_pfdict(self, f_name):
+    def gen_pfdict(self, f):
         lfreq = {}
         ltotal = 0
-        with open(f_name, 'rb') as f:
-            for lineno, line in enumerate(f, 1):
-                try:
-                    line = line.strip().decode('utf-8')
-                    word, freq = line.split(' ')[:2]
-                    freq = int(freq)
-                    lfreq[word] = freq
-                    ltotal += freq
-                    for ch in xrange(len(word)):
-                        wfrag = word[:ch + 1]
-                        if wfrag not in lfreq:
-                            lfreq[wfrag] = 0
-                except ValueError:
-                    raise ValueError(
-                        'invalid dictionary entry in %s at Line %s: %s' % (f_name, lineno, line))
+        f_name = resolve_filename(f)
+        for lineno, line in enumerate(f, 1):
+            try:
+                line = line.strip().decode('utf-8')
+                word, freq = line.split(' ')[:2]
+                freq = int(freq)
+                lfreq[word] = freq
+                ltotal += freq
+                for ch in xrange(len(word)):
+                    wfrag = word[:ch + 1]
+                    if wfrag not in lfreq:
+                        lfreq[wfrag] = 0
+            except ValueError:
+                raise ValueError(
+                    'invalid dictionary entry in %s at Line %s: %s' % (f_name, lineno, line))
+        f.close()
         return lfreq, ltotal
 
     def initialize(self, dictionary=None):
@@ -156,7 +161,7 @@ def initialize(dictionary=None):
             if self.initialized:
                 return
 
-            default_logger.debug("Building prefix dict from %s ..." % abs_path)
+            default_logger.debug("Building prefix dict from %s ..." % (abs_path or 'the default dictionary'))
             t1 = time.time()
             if self.cache_file:
                 cache_file = self.cache_file
@@ -173,7 +178,8 @@ def initialize(dictionary=None):
             tmpdir = os.path.dirname(cache_file)
 
             load_from_cache_fail = True
-            if os.path.isfile(cache_file) and os.path.getmtime(cache_file) > os.path.getmtime(abs_path):
+            if os.path.isfile(cache_file) and (abs_path == DEFAULT_DICT or
+                os.path.getmtime(cache_file) > os.path.getmtime(abs_path)):
                 default_logger.debug(
                     "Loading model from cache %s" % cache_file)
                 try:
@@ -187,7 +193,7 @@ def initialize(dictionary=None):
                 wlock = DICT_WRITING.get(abs_path, threading.RLock())
                 DICT_WRITING[abs_path] = wlock
                 with wlock:
-                    self.FREQ, self.total = self.gen_pfdict(abs_path)
+                    self.FREQ, self.total = self.gen_pfdict(self.get_dict_file())
                     default_logger.debug(
                         "Dumping model to file cache %s" % cache_file)
                     try:
@@ -394,8 +400,11 @@ def initialize(dictionary=None):
     def _lcut_for_search_no_hmm(self, sentence):
         return self.lcut_for_search(sentence, False)
 
-    def get_abs_path_dict(self):
-        return _get_abs_path(self.dictionary)
+    def get_dict_file(self):
+        if self.dictionary == DEFAULT_DICT:
+            return get_module_res(DEFAULT_DICT_NAME)
+        else:
+            return open(self.dictionary, 'rb')
 
     def load_userdict(self, f):
         '''
@@ -403,6 +412,8 @@ def initialize(dictionary=None):
 
         Parameter:
             - f : A plain text file contains words and their ocurrences.
+                  Can be a file-like object, or the path of the dictionary file,
+                  whose encoding must be utf-8.
 
         Structure of dict file:
         word1 freq1 word_type1
@@ -412,26 +423,26 @@ def initialize(dictionary=None):
         '''
         self.check_initialized()
         if isinstance(f, string_types):
+            f_name = f
             f = open(f, 'rb')
+        else:
+            f_name = resolve_filename(f)
         for lineno, ln in enumerate(f, 1):
-            try:
-                line = ln.strip().decode('utf-8').lstrip('\ufeff')
-                if not line:
-                    continue
-                tup = line.split(" ")
-                freq, tag = None, None
-                if len(tup) == 2:
-                    if tup[1].isdigit():
-                        freq = tup[1]
-                    else:
-                        tag = tup[1]
-                elif len(tup) > 2:
-                    freq, tag = tup[1], tup[2]
-                self.add_word(tup[0], freq, tag)
-            except Exception:
-                raise ValueError(
-                    'invalid dictionary entry in %s at Line %s: %s' % (
-                    f.name, lineno, line))
+            line = ln.strip()
+            if not isinstance(line, text_type):
+                try:
+                    line = line.decode('utf-8').lstrip('\ufeff')
+                except UnicodeDecodeError:
+                    raise ValueError('dictionary file %s must be utf-8' % f_name)
+            if not line:
+                continue
+            # match won't be None because there's at least one character
+            word, freq, tag = re_userdict.match(line).groups()
+            if freq is not None:
+                freq = freq.strip()
+            if tag is not None:
+                tag = tag.strip()
+            self.add_word(word, freq, tag)
 
     def add_word(self, word, freq=None, tag=None):
         """
@@ -442,7 +453,7 @@ def initialize(dictionary=None):
         """
         self.check_initialized()
         word = strdecode(word)
-        freq = int(freq) if freq else self.suggest_freq(word, False)
+        freq = int(freq) if freq is not None else self.suggest_freq(word, False)
         self.FREQ[word] = freq
         self.total += freq
         if tag:
@@ -451,6 +462,8 @@ def initialize(dictionary=None):
             wfrag = word[:ch + 1]
             if wfrag not in self.FREQ:
                 self.FREQ[wfrag] = 0
+        if freq == 0:
+            finalseg.add_force_split(word)
 
     def del_word(self, word):
         """
@@ -546,7 +559,7 @@ cut_for_search = dt.cut_for_search
 lcut_for_search = dt.lcut_for_search
 del_word = dt.del_word
 get_DAG = dt.get_DAG
-get_abs_path_dict = dt.get_abs_path_dict
+get_dict_file = dt.get_dict_file
 initialize = dt.initialize
 load_userdict = dt.load_userdict
 set_dictionary = dt.set_dictionary
@@ -561,6 +574,10 @@ def _lcut_all(s):
 
 def _lcut(s):
     return dt._lcut(s)
+
+
+def _lcut_no_hmm(s):
+    return dt._lcut_no_hmm(s)
 
 
 def _lcut_all(s):

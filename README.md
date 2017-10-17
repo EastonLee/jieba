@@ -89,8 +89,8 @@ print(", ".join(seg_list))
 ### 载入词典
 
 * 开发者可以指定自己自定义的词典，以便包含 jieba 词库里没有的词。虽然 jieba 有新词识别能力，但是自行添加新词可以保证更高的正确率
-* 用法： jieba.load_userdict(file_name) # file_name 为自定义词典的路径
-* 词典格式和 `dict.txt` 一样，一个词占一行；每一行分三部分：词语、词频（可省略）、词性（可省略），用空格隔开，顺序不可颠倒。
+* 用法： jieba.load_userdict(file_name) # file_name 为文件类对象或自定义词典的路径
+* 词典格式和 `dict.txt` 一样，一个词占一行；每一行分三部分：词语、词频（可省略）、词性（可省略），用空格隔开，顺序不可颠倒。`file_name` 若为路径或二进制方式打开的文件，则文件必须为 UTF-8 编码。
 * 词频省略时使用自动计算的能保证分出该词的词频。
 
 **例如：**
@@ -284,10 +284,13 @@ word 有限公司            start: 6                end:10
       -d [DELIM], --delimiter [DELIM]
                             使用 DELIM 分隔词语，而不是用默认的' / '。
                             若不指定 DELIM，则使用一个空格分隔。
+      -p [DELIM], --pos [DELIM]
+                            启用词性标注；如果指定 DELIM，词语和词性之间
+                            用它分隔，否则用 _ 分隔
       -D DICT, --dict DICT  使用 DICT 代替默认词典
       -u USER_DICT, --user-dict USER_DICT
                             使用 USER_DICT 作为附加词典，与默认词典或自定义词典配合使用
-      -a, --cut-all         全模式分词
+      -a, --cut-all         全模式分词（不支持词性标注）
       -n, --no-hmm          不使用隐含马尔可夫模型
       -q, --quiet           不输出载入信息到 STDERR
       -V, --version         显示版本信息并退出
@@ -297,8 +300,6 @@ word 有限公司            start: 6                end:10
 `--help` 选项输出：
 
     $> python -m jieba --help
-    usage: python -m jieba [options] filename
-
     Jieba command line interface.
 
     positional arguments:
@@ -309,11 +310,14 @@ word 有限公司            start: 6                end:10
       -d [DELIM], --delimiter [DELIM]
                             use DELIM instead of ' / ' for word delimiter; or a
                             space if it is used without DELIM
+      -p [DELIM], --pos [DELIM]
+                            enable POS tagging; if DELIM is specified, use DELIM
+                            instead of '_' for POS delimiter
       -D DICT, --dict DICT  use DICT as dictionary
       -u USER_DICT, --user-dict USER_DICT
                             use USER_DICT together with the default dictionary or
                             DICT (if specified)
-      -a, --cut-all         full pattern cutting
+      -a, --cut-all         full pattern cutting (ignored with POS tagging)
       -n, --no-hmm          don't use the Hidden Markov Model
       -q, --quiet           don't print loading messages to stderr
       -V, --version         show program's version number and exit
@@ -387,6 +391,12 @@ https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.big
 ----------------
 作者：anderscui
 地址：https://github.com/anderscui/jieba.NET/
+
+结巴分词 Go 版本
+----------------
+
++ 作者: wangbin 地址: https://github.com/wangbin/jiebago
++ 作者: yanyiwu 地址: https://github.com/yanyiwu/gojieba
 
 系统集成
 ========
@@ -518,11 +528,11 @@ Output:
 2. Add a custom dictionary
 ----------------------------
 
-###　Load dictionary
+### Load dictionary
 
 * Developers can specify their own custom dictionary to be included in the jieba default dictionary. Jieba is able to identify new words, but you can add your own new words can ensure a higher accuracy.
-* Usage： `jieba.load_userdict(file_name) # file_name is the path of the custom dictionary`
-* The dictionary format is the same as that of `dict.txt`: one word per line; each line is divided into three parts separated by a space: word, word frequency, POS tag.
+* Usage： `jieba.load_userdict(file_name)` # file_name is a file-like object or the path of the custom dictionary
+* The dictionary format is the same as that of `dict.txt`: one word per line; each line is divided into three parts separated by a space: word, word frequency, POS tag. If `file_name` is a path or a file opened in binary mode, the dictionary must be UTF-8 encoded.
 * The word frequency and POS tag can be omitted respectively. The word frequency will be filled with a suitable value if omitted.
 
 **For example:**
@@ -686,8 +696,6 @@ word 有限公司            start: 6                end:10
 --------------------------------
 
     $> python -m jieba --help
-    usage: python -m jieba [options] filename
-
     Jieba command line interface.
 
     positional arguments:
@@ -698,11 +706,14 @@ word 有限公司            start: 6                end:10
       -d [DELIM], --delimiter [DELIM]
                             use DELIM instead of ' / ' for word delimiter; or a
                             space if it is used without DELIM
+      -p [DELIM], --pos [DELIM]
+                            enable POS tagging; if DELIM is specified, use DELIM
+                            instead of '_' for POS delimiter
       -D DICT, --dict DICT  use DICT as dictionary
       -u USER_DICT, --user-dict USER_DICT
                             use USER_DICT together with the default dictionary or
                             DICT (if specified)
-      -a, --cut-all         full pattern cutting
+      -a, --cut-all         full pattern cutting (ignored with POS tagging)
       -n, --no-hmm          don't use the Hidden Markov Model
       -q, --quiet           don't print loading messages to stderr
       -V, --version         show program's version number and exit
