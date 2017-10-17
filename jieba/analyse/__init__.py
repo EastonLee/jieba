@@ -1,5 +1,6 @@
-#encoding=utf-8
 from __future__ import absolute_import
+from .tfidf import TFIDF
+from .textrank import TextRank
 import jieba
 #easton: cost a lot of time
 import jieba.posseg
@@ -11,9 +12,12 @@ try:
 except ImportError:
     pass
 
-_curpath = os.path.normpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-abs_path = os.path.join(_curpath, "idf.txt")
+default_tfidf = TFIDF()
+default_textrank = TextRank()
 
+extract_tags = tfidf = default_tfidf.extract_tags
+set_idf_path = default_tfidf.set_idf_path
+textrank = default_textrank.extract_tags
 STOP_WORDS = set((
     "the","of","is","and","to","in","that","we","for","an","are",
     "by","be","as","on","with","can","if","from","which","you","it",
@@ -54,53 +58,5 @@ def set_idf_path(idf_path):
     idf_loader.set_new_path(new_abs_path)
 
 def set_stop_words(stop_words_path):
-    global STOP_WORDS
-    abs_path = os.path.normpath(os.path.join(os.getcwd(), stop_words_path))
-    if not os.path.exists(abs_path):
-        raise Exception("jieba: path does not exist: " + abs_path)
-    content = open(abs_path,'rb').read().decode('utf-8')
-    lines = content.replace("\r", "").split('\n')
-    for line in lines:
-        STOP_WORDS.add(line)
-
-def extract_tags(sentence, topK=20, withWeight=False, allowPOS=[]):
-    """
-    Extract keywords from sentence using TF-IDF algorithm.
-    Parameter:
-        - topK: return how many top keywords. `None` for all possible words.
-        - withWeight: if True, return a list of (word, weight);
-                      if False, return a list of words.
-        - allowPOS: the allowed POS list eg. ['ns', 'n', 'vn', 'v','nr'].
-                    if the POS of w is not in this list,it will be filtered.
-    """
-    global STOP_WORDS, idf_loader
-
-    idf_freq, median_idf = idf_loader.get_idf()
-
-    if allowPOS:
-        allowPOS = frozenset(allowPOS)
-        words = jieba.posseg.cut(sentence)
-    else:
-        words = jieba.cut(sentence)
-    freq = {}
-    for w in words:
-        if allowPOS:
-            if w.flag not in allowPOS:
-                continue
-            else:
-                w = w.word
-        if len(w.strip()) < 2 or w.lower() in STOP_WORDS:
-            continue
-        freq[w] = freq.get(w, 0.0) + 1.0
-    total = sum(freq.values())
-    for k in freq:
-        freq[k] *= idf_freq.get(k, median_idf) / total
-
-    if withWeight:
-        tags = sorted(freq.items(), key=itemgetter(1), reverse=True)
-    else:
-        tags = sorted(freq, key=freq.__getitem__, reverse=True)
-    if topK:
-        return tags[:topK]
-    else:
-        return tags
+    default_tfidf.set_stop_words(stop_words_path)
+    default_textrank.set_stop_words(stop_words_path)
