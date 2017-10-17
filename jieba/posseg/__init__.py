@@ -68,11 +68,13 @@ if sys.platform.startswith("java"):
     char_state_tab_P, start_P, trans_P, emit_P, word_tag_tab = load_model(
         jieba.get_abs_path_dict())
 else:
+    #easton: cost much time
     from .char_state_tab import P as char_state_tab_P
     from .prob_start import P as start_P
     from .prob_trans import P as trans_P
+    #easton: cost much time
     from .prob_emit import P as emit_P
-
+    #easton: cost much time
     word_tag_tab = load_model(jieba.get_abs_path_dict(), isJython=False)
 
 

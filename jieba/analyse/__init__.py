@@ -1,6 +1,7 @@
 #encoding=utf-8
 from __future__ import absolute_import
 import jieba
+#easton: cost a lot of time
 import jieba.posseg
 import os
 from operator import itemgetter
@@ -30,6 +31,7 @@ class IDFLoader:
             content = open(new_idf_path, 'rb').read().decode('utf-8')
             idf_freq = {}
             lines = content.rstrip('\n').split('\n')
+            #easton: cost time
             for line in lines:
                 word, freq = line.split(' ')
                 idf_freq[word] = float(freq)
@@ -42,6 +44,7 @@ class IDFLoader:
         return self.idf_freq, self.median_idf
 
 idf_loader = IDFLoader()
+#easton: cost time
 idf_loader.set_new_path(abs_path)
 
 def set_idf_path(idf_path):

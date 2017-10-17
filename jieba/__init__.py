@@ -70,11 +70,15 @@ def initialize(dictionary=None):
             return
 
         abs_path = os.path.join(_curpath, dictionary)
-        logger.debug("Building prefix dict from %s ..." % abs_path)
+        #easton commented
+        #logger.debug("Building prefix dict from %s ..." % abs_path)
         t1 = time.time()
         # default dictionary
         if abs_path == os.path.join(_curpath, "dict.txt"):
-            cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.cache")
+            #easton modified
+            #easton: i prepared built cache file
+            #cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.cache")
+            cache_file = os.path.join(_curpath, 'jieba.cache')
         else:  # custom dictionary
             cache_file = os.path.join(tmp_dir if tmp_dir else tempfile.gettempdir(),"jieba.u%s.cache" % md5(
                 abs_path.encode('utf-8', 'replace')).hexdigest())
